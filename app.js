@@ -42,6 +42,29 @@ const useLocationBtn = document.getElementById("use-location-btn");
 const searchForm = document.getElementById("search-form");
 const cityInput = document.getElementById("city-input");
 
+const KOREAN_CITY_MAP = {
+  서울: "Seoul",
+  부산: "Busan",
+  인천: "Incheon",
+  대구: "Daegu",
+  대전: "Daejeon",
+  광주: "Gwangju",
+  울산: "Ulsan",
+  세종: "Sejong",
+  수원: "Suwon",
+  고양: "Goyang",
+  용인: "Yongin",
+  창원: "Changwon",
+  청주: "Cheongju",
+  전주: "Jeonju",
+  제주: "Jeju",
+  춘천: "Chuncheon",
+  강릉: "Gangneung",
+  천안: "Cheonan",
+  포항: "Pohang",
+  김해: "Gimhae"
+};
+
 function setStatus(message) {
   statusEl.textContent = message;
 }
@@ -112,6 +135,20 @@ async function geocodeCity(city) {
   return result;
 }
 
+function normalizeCityQuery(input) {
+  const value = input.trim();
+  return KOREAN_CITY_MAP[value] || value;
+}
+
+function toKoreanDisplayName(result, typedCity) {
+  const koreanTyped = typedCity.trim();
+  const matched = Object.entries(KOREAN_CITY_MAP).find(([, english]) => {
+    return english.toLowerCase() === String(result.name || "").toLowerCase();
+  });
+  const cityName = matched?.[0] || (/[가-힣]/.test(koreanTyped) ? koreanTyped : result.name);
+  return [cityName, result.admin1, result.country].filter(Boolean).join(", ");
+}
+
 async function loadByCoords({ latitude, longitude, label }) {
   setStatus("날씨 정보를 불러오는 중...");
   try {
@@ -161,8 +198,9 @@ searchForm.addEventListener("submit", async (event) => {
 
   setStatus("도시를 찾는 중...");
   try {
-    const result = await geocodeCity(city);
-    const label = [result.name, result.admin1, result.country].filter(Boolean).join(", ");
+    const query = normalizeCityQuery(city);
+    const result = await geocodeCity(query);
+    const label = toKoreanDisplayName(result, city);
     await loadByCoords({
       latitude: result.latitude,
       longitude: result.longitude,
