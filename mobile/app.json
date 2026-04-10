@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "PST Mail Query",
+    "slug": "pst-mail-query",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "platforms": ["ios", "android", "web"],
+    "assetBundlePatterns": ["**/*"]
+  }
+}
