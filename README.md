@@ -12,6 +12,18 @@
 python3 -m http.server 8080
 ```
 
+또는 실행용 파이썬 파일로 바로 실행:
+
+```bash
+python3 run_weather_app.py
+```
+
+기본 포트는 `8080`이며, 포트를 바꾸려면:
+
+```bash
+python3 run_weather_app.py 9090
+```
+
 브라우저에서 아래 주소로 접속:
 
 - PC: `http://localhost:8080`
