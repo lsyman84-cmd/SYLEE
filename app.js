@@ -213,7 +213,10 @@ searchForm.addEventListener("submit", async (event) => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {
+    navigator.serviceWorker.register("/sw.js").then((registration) => {
+      // 새 서비스워커가 있는지 즉시 확인해 오래된 캐시가 남지 않게 합니다.
+      registration.update();
+    }).catch(() => {
       // 서비스워커 등록 실패는 앱 동작에 치명적이지 않으므로 무시합니다.
     });
   });
