@@ -21,8 +21,20 @@ python3 run_weather_app.py
 기본 포트는 `8080`이며, 포트를 바꾸려면:
 
 ```bash
-python3 run_weather_app.py 9090
+python3 run_weather_app.py --port 9090
 ```
+
+이미 사용 중인 포트면 에러가 나므로, 다른 포트로 실행하세요:
+
+```bash
+python3 run_weather_app.py --port 8502
+```
+
+### Streamlit Cloud 배포용 실행
+
+Streamlit에서는 `run_weather_app.py` 대신 아래 파일을 엔트리포인트로 사용하세요.
+
+- `streamlit_app.py`
 
 브라우저에서 아래 주소로 접속:
 

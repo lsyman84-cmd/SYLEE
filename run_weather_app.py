@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import os
 import socket
+import sys
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -35,18 +36,36 @@ def detect_lan_ip() -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run weather app static server.")
     parser.add_argument("--host", default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
-    parser.add_argument("--port", default=8080, type=int, help="Bind port (default: 8080)")
+    parser.add_argument("--port", default=None, type=int, help="Bind port (default: 8080)")
+    parser.add_argument(
+        "legacy_port",
+        nargs="?",
+        type=int,
+        help="(legacy) positional port number. Use --port instead.",
+    )
     args = parser.parse_args()
+    port = args.port if args.port is not None else args.legacy_port
+    if port is None:
+        port = int(os.getenv("PORT", "8080"))
 
     project_root = Path(__file__).resolve().parent
     os.chdir(project_root)
 
-    httpd = ThreadingHTTPServer((args.host, args.port), NoCacheRequestHandler)
+    try:
+        httpd = ThreadingHTTPServer((args.host, port), NoCacheRequestHandler)
+    except OSError as error:
+        if getattr(error, "errno", None) == 98:
+            print(f"포트 {port}는 이미 사용 중입니다.")
+            print(f"다른 포트로 실행하세요: python3 {Path(__file__).name} --port 9090")
+            print("참고: Streamlit Cloud 배포는 streamlit_app.py 를 사용해야 합니다.")
+            sys.exit(1)
+        raise
+
     lan_ip = detect_lan_ip()
 
-    print(f"날씨 앱 서버 실행 중: http://localhost:{args.port}")
+    print(f"날씨 앱 서버 실행 중: http://localhost:{port}")
     if args.host in ("0.0.0.0", "::"):
-        print(f"휴대폰 접속 주소: http://{lan_ip}:{args.port}")
+        print(f"휴대폰 접속 주소: http://{lan_ip}:{port}")
     print("종료하려면 Ctrl+C를 누르세요.")
 
     try:
