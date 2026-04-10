@@ -1,0 +1,11 @@
+{
+  "name": "날씨 확인 앱",
+  "short_name": "날씨앱",
+  "description": "휴대폰에서 바로 실행 가능한 간단한 날씨 확인 앱",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "lang": "ko"
+}

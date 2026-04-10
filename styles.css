@@ -1,0 +1,148 @@
+:root {
+  color-scheme: light dark;
+  --bg: #0b1020;
+  --card: #161d33;
+  --text: #f4f7ff;
+  --muted: #b9c2db;
+  --primary: #4d8dff;
+  --primary-text: #ffffff;
+  --border: #2a355a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: radial-gradient(circle at top, #1d2e63 0%, var(--bg) 55%);
+  color: var(--text);
+}
+
+.app {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+}
+
+.app-header h1 {
+  margin: 8px 0 4px;
+  font-size: clamp(1.4rem, 5vw, 1.8rem);
+}
+
+.subtitle {
+  margin-top: 0;
+  color: var(--muted);
+}
+
+.controls {
+  display: grid;
+  gap: 10px;
+}
+
+.search-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+input {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+.btn {
+  border: 1px solid var(--border);
+  background: #24325a;
+  color: var(--text);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 0.98rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn.primary {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-color: transparent;
+}
+
+.status {
+  min-height: 24px;
+  margin: 12px 0;
+  color: var(--muted);
+}
+
+.weather-card {
+  margin-top: 12px;
+  background: color-mix(in hsl, var(--card) 90%, black);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.weather-card h2 {
+  margin: 0;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.temperature-wrap {
+  margin-top: 8px;
+}
+
+#temperature {
+  margin: 0;
+  font-size: clamp(2rem, 11vw, 3rem);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+#condition {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.details {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.details > div {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 4px;
+}
+
+.details span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.hidden {
+  display: none;
+}
+
+.visually-hidden {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+}
