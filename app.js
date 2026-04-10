@@ -65,6 +65,29 @@ const KOREAN_CITY_MAP = {
   김해: "Gimhae"
 };
 
+const LOCAL_CITY_COORDS = {
+  서울: { latitude: 37.5665, longitude: 126.978, admin1: "서울특별시", country: "대한민국" },
+  부산: { latitude: 35.1796, longitude: 129.0756, admin1: "부산광역시", country: "대한민국" },
+  인천: { latitude: 37.4563, longitude: 126.7052, admin1: "인천광역시", country: "대한민국" },
+  대구: { latitude: 35.8714, longitude: 128.6014, admin1: "대구광역시", country: "대한민국" },
+  대전: { latitude: 36.3504, longitude: 127.3845, admin1: "대전광역시", country: "대한민국" },
+  광주: { latitude: 35.1595, longitude: 126.8526, admin1: "광주광역시", country: "대한민국" },
+  울산: { latitude: 35.5384, longitude: 129.3114, admin1: "울산광역시", country: "대한민국" },
+  세종: { latitude: 36.4801, longitude: 127.289, admin1: "세종특별자치시", country: "대한민국" },
+  수원: { latitude: 37.2636, longitude: 127.0286, admin1: "경기도", country: "대한민국" },
+  고양: { latitude: 37.6584, longitude: 126.832, admin1: "경기도", country: "대한민국" },
+  용인: { latitude: 37.2411, longitude: 127.1776, admin1: "경기도", country: "대한민국" },
+  창원: { latitude: 35.2281, longitude: 128.6811, admin1: "경상남도", country: "대한민국" },
+  청주: { latitude: 36.6424, longitude: 127.489, admin1: "충청북도", country: "대한민국" },
+  전주: { latitude: 35.8242, longitude: 127.148, admin1: "전라북도", country: "대한민국" },
+  제주: { latitude: 33.4996, longitude: 126.5312, admin1: "제주특별자치도", country: "대한민국" },
+  춘천: { latitude: 37.8813, longitude: 127.7298, admin1: "강원도", country: "대한민국" },
+  강릉: { latitude: 37.7519, longitude: 128.8761, admin1: "강원도", country: "대한민국" },
+  천안: { latitude: 36.8151, longitude: 127.1139, admin1: "충청남도", country: "대한민국" },
+  포항: { latitude: 36.019, longitude: 129.3435, admin1: "경상북도", country: "대한민국" },
+  김해: { latitude: 35.2342, longitude: 128.8811, admin1: "경상남도", country: "대한민국" }
+};
+
 function setStatus(message) {
   statusEl.textContent = message;
 }
@@ -115,10 +138,29 @@ async function fetchWeather(latitude, longitude) {
 }
 
 async function geocodeCity(city) {
+  const attempts = [city, `${city}, South Korea`, `${city}, Korea`];
+  for (const query of attempts) {
+    const found = await geocodeCityOnce(query, "ko");
+    if (found) {
+      return found;
+    }
+  }
+
+  for (const query of attempts) {
+    const found = await geocodeCityOnce(query, "en");
+    if (found) {
+      return found;
+    }
+  }
+
+  throw new Error("도시를 찾을 수 없습니다. 다른 이름으로 시도해 주세요.");
+}
+
+async function geocodeCityOnce(city, language) {
   const params = new URLSearchParams({
     name: city,
     count: "1",
-    language: "ko",
+    language,
     format: "json"
   });
 
@@ -129,15 +171,49 @@ async function geocodeCity(city) {
 
   const data = await response.json();
   const result = data?.results?.[0];
-  if (!result) {
-    throw new Error("도시를 찾을 수 없습니다. 다른 이름으로 시도해 주세요.");
+  return result || null;
+}
+
+function normalizeCityName(input) {
+  const value = input.trim();
+  if (!value) {
+    return value;
   }
-  return result;
+
+  const noSpace = value.replace(/\s+/g, "");
+  const withoutRegionalSuffix = noSpace.replace(
+    /(특별자치시|특별자치도|특별시|광역시|자치시|자치도)$/u,
+    ""
+  );
+  const withoutCitySuffix =
+    withoutRegionalSuffix.length > 2 ? withoutRegionalSuffix.replace(/시$/u, "") : withoutRegionalSuffix;
+  return withoutCitySuffix || value;
+}
+
+function findLocalCity(input) {
+  const normalized = normalizeCityName(input);
+  const cityKey = KOREAN_CITY_MAP[normalized] ? normalized : null;
+  if (!cityKey) {
+    return null;
+  }
+
+  const coords = LOCAL_CITY_COORDS[cityKey];
+  if (!coords) {
+    return null;
+  }
+
+  return {
+    name: cityKey,
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+    admin1: coords.admin1,
+    country: coords.country
+  };
 }
 
 function normalizeCityQuery(input) {
-  const value = input.trim();
-  return KOREAN_CITY_MAP[value] || value;
+  const normalized = normalizeCityName(input);
+  return KOREAN_CITY_MAP[normalized] || normalized;
 }
 
 function toKoreanDisplayName(result, typedCity) {
@@ -198,8 +274,8 @@ searchForm.addEventListener("submit", async (event) => {
 
   setStatus("도시를 찾는 중...");
   try {
-    const query = normalizeCityQuery(city);
-    const result = await geocodeCity(query);
+    const localResult = findLocalCity(city);
+    const result = localResult || (await geocodeCity(normalizeCityQuery(city)));
     const label = toKoreanDisplayName(result, city);
     await loadByCoords({
       latitude: result.latitude,
@@ -213,7 +289,7 @@ searchForm.addEventListener("submit", async (event) => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").then((registration) => {
+    navigator.serviceWorker.register("/sw.js?v=3").then((registration) => {
       // 새 서비스워커가 있는지 즉시 확인해 오래된 캐시가 남지 않게 합니다.
       registration.update();
     }).catch(() => {
