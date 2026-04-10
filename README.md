@@ -35,6 +35,11 @@ python3 run_weather_app.py --port 8502
 Streamlit에서는 `run_weather_app.py` 대신 아래 파일을 엔트리포인트로 사용하세요.
 
 - `streamlit_app.py`
+- `requirements.txt` (자동 설치)
+
+Streamlit App 설정:
+
+- **Main file path**: `streamlit_app.py`
 
 브라우저에서 아래 주소로 접속:
 
@@ -43,9 +48,9 @@ Streamlit에서는 `run_weather_app.py` 대신 아래 파일을 엔트리포인�
 
 ### 사용 방법
 
-1. `내 위치로 확인` 버튼으로 현재 위치 날씨 조회
-2. 또는 도시 이름(예: 서울, 부산, 대구)으로 검색
-3. 모바일 브라우저 메뉴에서 **홈 화면에 추가**하면 앱처럼 즉시 실행 가능
+1. 도시 이름(예: 서울, 부산, 대구)을 입력하고 `날씨 조회`
+2. 또는 좌표(위도/경도)로 직접 조회 가능
+3. `최근 조회 도시` 버튼으로 빠르게 재조회
 
 ### 사용 API
 
