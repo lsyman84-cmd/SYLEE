@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Bear</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #fdf6ee;
+      --panel: #fff8f0;
+      --accent: #f4a261;
+      --accent2: #e76f51;
+      --text: #3d2b1f;
+      --shadow: rgba(61, 43, 31, 0.15);
+      --btn-idle:    #a8dadc;
+      --btn-happy:   #f4c95d;
+      --btn-hungry:  #f4a261;
+      --btn-sleepy:  #c9b8e8;
+    }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: var(--text);
+      user-select: none;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: .05em;
+      margin-bottom: 1.8rem;
+      opacity: .7;
+    }
+
+    /* ── Stage ─────────────────────────────────────── */
+    #stage {
+      position: relative;
+      width: 260px;
+      height: 280px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    #bear-wrap {
+      position: relative;
+      width: 200px;
+      height: 220px;
+      transform-origin: center bottom;
+      will-change: transform;
+    }
+
+    #bear-svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      filter: drop-shadow(0 12px 24px var(--shadow));
+    }
+
+    /* ── Particle canvas ────────────────────────────── */
+    #particle-canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+    }
+
+    /* ── Status badge ───────────────────────────────── */
+    #status-badge {
+      margin-top: 1.4rem;
+      padding: .45em 1.2em;
+      border-radius: 999px;
+      font-size: .9rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      background: var(--accent);
+      color: #fff;
+      transition: background .4s, transform .2s;
+      box-shadow: 0 4px 12px var(--shadow);
+    }
+
+    /* ── Speech bubble ──────────────────────────────── */
+    #speech {
+      position: absolute;
+      top: -10px; right: -30px;
+      background: #fff;
+      border-radius: 18px 18px 18px 4px;
+      padding: .5em .9em;
+      font-size: .82rem;
+      font-weight: 600;
+      box-shadow: 0 4px 16px var(--shadow);
+      white-space: nowrap;
+      opacity: 0;
+      transform: scale(.6) translateY(8px);
+      transform-origin: bottom left;
+      transition: opacity .25s, transform .25s cubic-bezier(.34,1.56,.64,1);
+      pointer-events: none;
+      z-index: 10;
+    }
+    #speech.visible {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+
+    /* ── Buttons ────────────────────────────────────── */
+    #controls {
+      display: flex;
+      gap: .8rem;
+      margin-top: 1.8rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .ctrl-btn {
+      padding: .55em 1.3em;
+      border: none;
+      border-radius: 999px;
+      font-size: .88rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .15s cubic-bezier(.34,1.56,.64,1),
+                  box-shadow .15s, opacity .15s;
+      box-shadow: 0 4px 12px var(--shadow);
+      letter-spacing: .04em;
+    }
+    .ctrl-btn:active { transform: scale(.92) !important; }
+
+    .ctrl-btn[data-state="idle"]   { background: var(--btn-idle);   color: #1d5c63; }
+    .ctrl-btn[data-state="happy"]  { background: var(--btn-happy);  color: #7a4e00; }
+    .ctrl-btn[data-state="hungry"] { background: var(--btn-hungry); color: #7a2700; }
+    .ctrl-btn[data-state="sleepy"] { background: var(--btn-sleepy); color: #3b2a6e; }
+
+    .ctrl-btn.active { transform: scale(1.1); box-shadow: 0 6px 20px var(--shadow); }
+
+    /* ── Breathing ring ─────────────────────────────── */
+    #breath-ring {
+      position: absolute;
+      width: 220px; height: 220px;
+      border-radius: 50%;
+      border: 3px solid rgba(244,162,97,.25);
+      animation: breathRing 3s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes breathRing {
+      0%, 100% { transform: scale(1); opacity: .4; }
+      50%       { transform: scale(1.08); opacity: .15; }
+    }
+
+    /* SVG eye states via class on #bear-svg */
+    .eye-normal   { display: block; }
+    .eye-happy    { display: none; }
+    .eye-sleepy   { display: none; }
+    .eye-blink    { display: none; }
+
+    #bear-svg.state-happy  .eye-normal  { display: none; }
+    #bear-svg.state-happy  .eye-happy   { display: block; }
+
+    #bear-svg.state-sleepy .eye-normal  { display: none; }
+    #bear-svg.state-sleepy .eye-sleepy  { display: block; }
+
+    #bear-svg.blink        .eye-normal  { display: none; }
+    #bear-svg.blink        .eye-blink   { display: block; }
+  </style>
+</head>
+<body>
+  <h1>🐻 Interactive Bear</h1>
+
+  <div id="stage">
+    <div id="breath-ring"></div>
+
+    <div id="bear-wrap">
+      <canvas id="particle-canvas" width="260" height="280"></canvas>
+
+      <svg id="bear-svg" viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <!-- shine gradient for eyes -->
+          <radialGradient id="eyeShine" cx="30%" cy="30%" r="60%">
+            <stop offset="0%" stop-color="#fff" stop-opacity=".9"/>
+            <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+          </radialGradient>
+          <!-- body gradient -->
+          <radialGradient id="bodyGrad" cx="45%" cy="35%" r="65%">
+            <stop offset="0%" stop-color="#d4956a"/>
+            <stop offset="100%" stop-color="#a0613a"/>
+          </radialGradient>
+          <!-- belly gradient -->
+          <radialGradient id="bellyGrad" cx="50%" cy="40%" r="60%">
+            <stop offset="0%" stop-color="#f7d9be"/>
+            <stop offset="100%" stop-color="#e8b98a"/>
+          </radialGradient>
+        </defs>
+
+        <!-- ── EARS ─────────────────────────────────── -->
+        <g id="ear-left">
+          <ellipse cx="52" cy="52" rx="26" ry="26" fill="url(#bodyGrad)"/>
+          <ellipse cx="52" cy="52" rx="16" ry="16" fill="#f0b48a"/>
+        </g>
+        <g id="ear-right">
+          <ellipse cx="148" cy="52" rx="26" ry="26" fill="url(#bodyGrad)"/>
+          <ellipse cx="148" cy="52" rx="16" ry="16" fill="#f0b48a"/>
+        </g>
+
+        <!-- ── BODY ──────────────────────────────────── -->
+        <g id="body-group">
+          <!-- main body -->
+          <ellipse id="body-ellipse" cx="100" cy="165" rx="62" ry="58" fill="url(#bodyGrad)"/>
+          <!-- belly -->
+          <ellipse id="belly" cx="100" cy="170" rx="40" ry="38" fill="url(#bellyGrad)"/>
+          <!-- paws -->
+          <ellipse cx="50" cy="200" rx="20" ry="12" fill="#a0613a"/>
+          <ellipse cx="150" cy="200" rx="20" ry="12" fill="#a0613a"/>
+          <ellipse cx="50" cy="200" rx="14" ry="8" fill="#c4825a"/>
+          <ellipse cx="150" cy="200" rx="14" ry="8" fill="#c4825a"/>
+        </g>
+
+        <!-- ── HEAD ──────────────────────────────────── -->
+        <g id="head-group">
+          <!-- head base -->
+          <ellipse cx="100" cy="105" rx="68" ry="65" fill="url(#bodyGrad)"/>
+
+          <!-- cheeks (blush) -->
+          <ellipse id="cheek-left"  cx="60"  cy="120" rx="16" ry="10" fill="#f4a0a0" opacity=".55"/>
+          <ellipse id="cheek-right" cx="140" cy="120" rx="16" ry="10" fill="#f4a0a0" opacity=".55"/>
+
+          <!-- muzzle -->
+          <ellipse cx="100" cy="126" rx="30" ry="22" fill="#f7d9be"/>
+
+          <!-- ── EYES ─────────────────────────────────── -->
+          <g id="eye-left-group">
+            <!-- normal -->
+            <g class="eye-normal">
+              <ellipse cx="78" cy="102" rx="11" ry="12" fill="#2d1a0e"/>
+              <ellipse cx="78" cy="102" rx="7"  ry="8"  fill="#4a2f1e"/>
+              <circle  cx="82" cy="97"  r="4"  fill="url(#eyeShine)"/>
+              <circle  cx="74" cy="107" r="2"  fill="#fff" opacity=".35"/>
+            </g>
+            <!-- happy (^‿^) -->
+            <g class="eye-happy">
+              <path d="M68,108 Q78,96 88,108" fill="none" stroke="#2d1a0e" stroke-width="3.5" stroke-linecap="round"/>
+              <circle cx="76" cy="100" r="3" fill="#fff" opacity=".6"/>
+            </g>
+            <!-- sleepy (half-closed) -->
+            <g class="eye-sleepy">
+              <ellipse cx="78" cy="106" rx="11" ry="6" fill="#2d1a0e"/>
+              <line x1="67" y1="100" x2="89" y2="100" stroke="#2d1a0e" stroke-width="3" stroke-linecap="round"/>
+            </g>
+            <!-- blink (flat line) -->
+            <g class="eye-blink">
+              <line x1="68" y1="103" x2="88" y2="103" stroke="#2d1a0e" stroke-width="3.5" stroke-linecap="round"/>
+            </g>
+          </g>
+
+          <g id="eye-right-group">
+            <!-- normal -->
+            <g class="eye-normal">
+              <ellipse cx="122" cy="102" rx="11" ry="12" fill="#2d1a0e"/>
+              <ellipse cx="122" cy="102" rx="7"  ry="8"  fill="#4a2f1e"/>
+              <circle  cx="126" cy="97"  r="4"  fill="url(#eyeShine)"/>
+              <circle  cx="118" cy="107" r="2"  fill="#fff" opacity=".35"/>
+            </g>
+            <!-- happy -->
+            <g class="eye-happy">
+              <path d="M112,108 Q122,96 132,108" fill="none" stroke="#2d1a0e" stroke-width="3.5" stroke-linecap="round"/>
+              <circle cx="120" cy="100" r="3" fill="#fff" opacity=".6"/>
+            </g>
+            <!-- sleepy -->
+            <g class="eye-sleepy">
+              <ellipse cx="122" cy="106" rx="11" ry="6" fill="#2d1a0e"/>
+              <line x1="111" y1="100" x2="133" y2="100" stroke="#2d1a0e" stroke-width="3" stroke-linecap="round"/>
+            </g>
+            <!-- blink -->
+            <g class="eye-blink">
+              <line x1="112" y1="103" x2="132" y2="103" stroke="#2d1a0e" stroke-width="3.5" stroke-linecap="round"/>
+            </g>
+          </g>
+
+          <!-- ── NOSE ─────────────────────────────────── -->
+          <ellipse cx="100" cy="120" rx="8" ry="6" fill="#2d1a0e"/>
+          <ellipse cx="98"  cy="118" rx="3" ry="2" fill="#fff" opacity=".4"/>
+
+          <!-- ── MOUTH ────────────────────────────────── -->
+          <!-- idle / default -->
+          <g id="mouth-idle">
+            <path d="M92,132 Q100,140 108,132" fill="none" stroke="#2d1a0e" stroke-width="2.5" stroke-linecap="round"/>
+          </g>
+          <!-- happy -->
+          <g id="mouth-happy" style="display:none">
+            <path d="M88,131 Q100,145 112,131" fill="none" stroke="#2d1a0e" stroke-width="3" stroke-linecap="round"/>
+            <!-- teeth -->
+            <path d="M94,133 Q100,140 106,133" fill="#fff" stroke="none"/>
+          </g>
+          <!-- hungry (big open mouth) -->
+          <g id="mouth-hungry" style="display:none">
+            <ellipse cx="100" cy="137" rx="18" ry="14" fill="#2d1a0e"/>
+            <ellipse cx="100" cy="133" rx="16" ry="8" fill="#c1504b"/>
+            <ellipse cx="100" cy="144" rx="12" ry="5" fill="#7a1f1a"/>
+            <!-- tongue -->
+            <ellipse cx="100" cy="144" rx="10" ry="5" fill="#e05555"/>
+          </g>
+          <!-- sleepy (small, droopy) -->
+          <g id="mouth-sleepy" style="display:none">
+            <path d="M95,134 Q100,137 105,134" fill="none" stroke="#2d1a0e" stroke-width="2" stroke-linecap="round"/>
+          </g>
+        </g>
+
+        <!-- ── ZZZ overlay ──────────────────────────── -->
+        <g id="zzz-wrap" style="display:none">
+          <text x="152" y="70" font-size="14" font-weight="900" fill="#c9b8e8" opacity=".9">z</text>
+          <text x="163" y="55" font-size="18" font-weight="900" fill="#c9b8e8" opacity=".7">z</text>
+          <text x="177" y="36" font-size="22" font-weight="900" fill="#c9b8e8" opacity=".5">z</text>
+        </g>
+
+        <!-- ── SPARKLES (happy) ─────────────────────── -->
+        <g id="sparkles" style="display:none; pointer-events:none">
+          <text x="30"  y="50"  font-size="16">✨</text>
+          <text x="155" y="45"  font-size="14">⭐</text>
+          <text x="22"  y="90"  font-size="12">✨</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- speech bubble attached to stage -->
+    <div id="speech"></div>
+  </div>
+
+  <div id="status-badge">😊 IDLE</div>
+
+  <div id="controls">
+    <button class="ctrl-btn active" data-state="idle">😊 Idle</button>
+    <button class="ctrl-btn" data-state="happy">🌟 Happy</button>
+    <button class="ctrl-btn" data-state="hungry">🍖 Hungry</button>
+    <button class="ctrl-btn" data-state="sleepy">😴 Sleepy</button>
+  </div>
+
+  <script>
+  /* ═══════════════════════════════════════════════════════════════
+     BearController — "Living Character" interactive bear
+  ═══════════════════════════════════════════════════════════════ */
+  class BearController {
+    /* ── State config ─────────────────────────────────────────── */
+    static STATES = {
+      idle: {
+        label: '😊 IDLE',
+        badgeBg: '#a8dadc',
+        badgeColor: '#1d5c63',
+        speech: ['...', 'hi~', '(^▽^)', '♪'],
+        breathScale: [1, 1.025],
+        breathSpeed: 2800,
+      },
+      happy: {
+        label: '🌟 HAPPY',
+        badgeBg: '#f4c95d',
+        badgeColor: '#7a4e00',
+        speech: ['YAY!', 'woohoo~', '★★★', '(*´∀`)♪'],
+        breathScale: [1, 1.04],
+        breathSpeed: 1600,
+      },
+      hungry: {
+        label: '🍖 HUNGRY',
+        badgeBg: '#f4a261',
+        badgeColor: '#7a2700',
+        speech: ['nomnom...', 'feed me!', 'hungry...', '( ˘ ³˘)♥'],
+        breathScale: [1, 1.015],
+        breathSpeed: 3200,
+      },
+      sleepy: {
+        label: '😴 SLEEPY',
+        badgeBg: '#c9b8e8',
+        badgeColor: '#3b2a6e',
+        speech: ['zzz...', 'sleepy...', '💤', '*yawn*'],
+        breathScale: [1, 1.01],
+        breathSpeed: 4500,
+      },
+    };
+
+    /* ── Constructor ──────────────────────────────────────────── */
+    constructor() {
+      this.state       = 'idle';
+      this.blinkTimer  = null;
+      this.speechTimer = null;
+      this.breathAnim  = null;
+      this.headAnim    = null;
+      this.zzzAnim     = null;
+      this.sparkleAnim = null;
+      this.isPoking    = false;
+
+      // DOM refs
+      this.svg         = document.getElementById('bear-svg');
+      this.bearWrap    = document.getElementById('bear-wrap');
+      this.headGroup   = document.getElementById('head-group');
+      this.bodyGroup   = document.getElementById('body-group');
+      this.badge       = document.getElementById('status-badge');
+      this.speech      = document.getElementById('speech');
+      this.stage       = document.getElementById('stage');
+      this.canvas      = document.getElementById('particle-canvas');
+      this.ctx         = this.canvas.getContext('2d');
+      this.buttons     = document.querySelectorAll('.ctrl-btn');
+
+      // Mouth elements
+      this.mouths = {
+        idle:   document.getElementById('mouth-idle'),
+        happy:  document.getElementById('mouth-happy'),
+        hungry: document.getElementById('mouth-hungry'),
+        sleepy: document.getElementById('mouth-sleepy'),
+      };
+
+      // Overlay elements
+      this.zzzEl     = document.getElementById('zzz-wrap');
+      this.sparkleEl = document.getElementById('sparkles');
+
+      // Cheeks
+      this.cheekL = document.getElementById('cheek-left');
+      this.cheekR = document.getElementById('cheek-right');
+
+      this.particles = [];
+
+      this._bindEvents();
+      this._startState('idle');
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       STATE MANAGEMENT
+    ══════════════════════════════════════════════════════════ */
+    setState(newState) {
+      if (this.state === newState) return;
+      this._stopAllLoops();
+      this.state = newState;
+      this._startState(newState);
+      this._updateButtons(newState);
+      this._showSpeech();
+    }
+
+    _startState(state) {
+      const cfg = BearController.STATES[state];
+
+      // Badge
+      this.badge.textContent = cfg.label;
+      this.badge.style.background = cfg.badgeBg;
+      this.badge.style.color = cfg.badgeColor;
+
+      // SVG class for eye shape
+      this.svg.className.baseVal = `state-${state}`;
+
+      // Mouth
+      Object.entries(this.mouths).forEach(([k, el]) => {
+        el.style.display = (k === state) ? '' : 'none';
+      });
+
+      // Overlays
+      this.zzzEl.style.display      = state === 'sleepy' ? '' : 'none';
+      this.sparkleEl.style.display  = state === 'happy'  ? '' : 'none';
+
+      // Cheek blush
+      const blushOpacity = { idle: .55, happy: .8, hungry: .35, sleepy: .45 };
+      [this.cheekL, this.cheekR].forEach(c => {
+        c.setAttribute('opacity', blushOpacity[state]);
+      });
+
+      // Start loops
+      this._startBreathing(cfg);
+      this._startBlinking(state);
+      this._startHeadBob(state);
+      if (state === 'happy')  this._startSparkleAnim();
+      if (state === 'sleepy') this._startZzzAnim();
+    }
+
+    _stopAllLoops() {
+      clearTimeout(this.blinkTimer);
+      clearTimeout(this.speechTimer);
+      if (this.breathAnim)  { this.breathAnim.cancel();  this.breathAnim  = null; }
+      if (this.headAnim)    { this.headAnim.cancel();    this.headAnim    = null; }
+      if (this.zzzAnim)     { this.zzzAnim.cancel();     this.zzzAnim     = null; }
+      if (this.sparkleAnim) { this.sparkleAnim.cancel(); this.sparkleAnim = null; }
+      this.svg.classList.remove('blink');
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       ANIMATION LOOPS
+    ══════════════════════════════════════════════════════════ */
+
+    /* Breathing — subtle scale on the whole bear */
+    _startBreathing(cfg) {
+      const [s0, s1] = cfg.breathScale;
+      this.breathAnim = this.bearWrap.animate([
+        { transform: `scale(${s0})`, offset: 0 },
+        { transform: `scale(${s1})`, offset: .5 },
+        { transform: `scale(${s0})`, offset: 1 },
+      ], {
+        duration: cfg.breathSpeed,
+        easing: 'cubic-bezier(0.45, 0, 0.55, 1)',
+        iterations: Infinity,
+        fill: 'both',
+      });
+    }
+
+    /* Blinking — random interval */
+    _startBlinking(state) {
+      const minMs = state === 'sleepy' ? 800  : 2500;
+      const maxMs = state === 'sleepy' ? 2000 : 6000;
+
+      const schedBlink = () => {
+        const delay = minMs + Math.random() * (maxMs - minMs);
+        this.blinkTimer = setTimeout(() => {
+          this._doBlink(state);
+          schedBlink();
+        }, delay);
+      };
+      schedBlink();
+    }
+
+    _doBlink(state) {
+      if (state === 'sleepy') {
+        // slow, heavy blink
+        this.svg.classList.add('blink');
+        setTimeout(() => this.svg.classList.remove('blink'), 400);
+      } else {
+        this.svg.classList.add('blink');
+        setTimeout(() => this.svg.classList.remove('blink'), 120);
+      }
+    }
+
+    /* Head bob — gentle tilt */
+    _startHeadBob(state) {
+      const deg     = state === 'happy' ? 6 : state === 'sleepy' ? 10 : 3;
+      const durMs   = state === 'sleepy' ? 4000 : state === 'happy' ? 1400 : 3000;
+      const easing  = state === 'happy'
+        ? 'cubic-bezier(0.34, 1.56, 0.64, 1)'
+        : 'cubic-bezier(0.45, 0, 0.55, 1)';
+
+      this.headAnim = this.headGroup.animate([
+        { transform: 'rotate(0deg)',     offset: 0 },
+        { transform: `rotate(${deg}deg)`, offset: .5 },
+        { transform: 'rotate(0deg)',     offset: 1 },
+      ], {
+        duration: durMs,
+        easing,
+        iterations: Infinity,
+        fill: 'both',
+        transformOrigin: '100px 105px',
+      });
+    }
+
+    /* Sparkle float animation */
+    _startSparkleAnim() {
+      this.sparkleAnim = this.sparkleEl.animate([
+        { opacity: .6, transform: 'translateY(0)' },
+        { opacity: 1,  transform: 'translateY(-8px)' },
+        { opacity: .6, transform: 'translateY(0)' },
+      ], {
+        duration: 1200,
+        iterations: Infinity,
+        easing: 'ease-in-out',
+      });
+    }
+
+    /* Zzz float animation */
+    _startZzzAnim() {
+      this.zzzAnim = this.zzzEl.animate([
+        { opacity: .9, transform: 'translateY(0)' },
+        { opacity: .4, transform: 'translateY(-14px)' },
+        { opacity: 0,  transform: 'translateY(-28px)' },
+      ], {
+        duration: 2200,
+        iterations: Infinity,
+        easing: 'ease-in-out',
+      });
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       MOUSE TRACKING — eyes + head follow cursor
+    ══════════════════════════════════════════════════════════ */
+    _onMouseMove(e) {
+      const rect  = this.stage.getBoundingClientRect();
+      const cx    = rect.left + rect.width  / 2;
+      const cy    = rect.top  + rect.height / 2;
+      const dx    = (e.clientX - cx) / (rect.width  / 2);  // −1..1
+      const dy    = (e.clientY - cy) / (rect.height / 2);  // −1..1
+
+      const maxEye  = 3.5;
+      const maxHead = 4;
+
+      const ex = dx * maxEye;
+      const ey = dy * maxEye;
+      const hx = dx * maxHead;
+      const hy = dy * maxHead;
+
+      // Move pupil groups via SVG translate
+      document.getElementById('eye-left-group').setAttribute(
+        'transform', `translate(${ex},${ey})`);
+      document.getElementById('eye-right-group').setAttribute(
+        'transform', `translate(${ex},${ey})`);
+
+      // Tilt head slightly
+      if (this.headAnim) this.headAnim.pause();
+      this.headGroup.style.transform =
+        `translate(${hx}px,${hy * .6}px) rotate(${hx * .8}deg)`;
+    }
+
+    _onMouseLeave() {
+      document.getElementById('eye-left-group').setAttribute('transform', '');
+      document.getElementById('eye-right-group').setAttribute('transform', '');
+      this.headGroup.style.transform = '';
+      if (this.headAnim) this.headAnim.play();
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       CLICK — poke reaction (squash & stretch)
+    ══════════════════════════════════════════════════════════ */
+    _onStageClick(e) {
+      if (this.isPoking) return;
+      this.isPoking = true;
+
+      // Squash down then stretch bounce
+      const poke = this.bearWrap.animate([
+        { transform: 'scale(1,1)',          offset: 0 },
+        { transform: 'scale(1.18, 0.82)',   offset: .18, easing: 'cubic-bezier(0.34,1.56,0.64,1)' },
+        { transform: 'scale(0.9, 1.12)',    offset: .4,  easing: 'cubic-bezier(0.34,1.56,0.64,1)' },
+        { transform: 'scale(1.06, 0.96)',   offset: .6,  easing: 'cubic-bezier(0.34,1.56,0.64,1)' },
+        { transform: 'scale(1, 1)',         offset: 1 },
+      ], { duration: 550, easing: 'ease-out', fill: 'forwards' });
+
+      poke.onfinish = () => {
+        poke.cancel();
+        this.isPoking = false;
+      };
+
+      // Brief blush boost
+      [this.cheekL, this.cheekR].forEach(c => {
+        c.setAttribute('opacity', '1');
+        setTimeout(() => {
+          const blush = { idle: .55, happy: .8, hungry: .35, sleepy: .45 };
+          c.setAttribute('opacity', blush[this.state]);
+        }, 400);
+      });
+
+      // Emit particles
+      const rect = this.canvas.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      this._spawnParticles(px, py);
+
+      // Show speech
+      this._showSpeech();
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       SPEECH BUBBLE
+    ══════════════════════════════════════════════════════════ */
+    _showSpeech() {
+      clearTimeout(this.speechTimer);
+      const lines = BearController.STATES[this.state].speech;
+      this.speech.textContent = lines[Math.floor(Math.random() * lines.length)];
+      this.speech.classList.add('visible');
+      this.speechTimer = setTimeout(() => {
+        this.speech.classList.remove('visible');
+      }, 2200);
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       PARTICLE SYSTEM
+    ══════════════════════════════════════════════════════════ */
+    _spawnParticles(x, y) {
+      const colors = {
+        idle:   ['#a8dadc','#57cc99','#80b918'],
+        happy:  ['#f4c95d','#f4a261','#ff6b6b','#c9f'],
+        hungry: ['#f4a261','#e76f51','#c4562b'],
+        sleepy: ['#c9b8e8','#a78bca','#e8d5ff'],
+      }[this.state];
+
+      for (let i = 0; i < 14; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1.5 + Math.random() * 3.5;
+        this.particles.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 1.5,
+          radius: 3 + Math.random() * 5,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          alpha: 1,
+          decay: .025 + Math.random() * .03,
+          gravity: .12,
+        });
+      }
+      if (!this._rafRunning) this._particleLoop();
+    }
+
+    _particleLoop() {
+      this._rafRunning = true;
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+      this.particles = this.particles.filter(p => p.alpha > 0.02);
+      this.particles.forEach(p => {
+        p.vy += p.gravity;
+        p.x  += p.vx;
+        p.y  += p.vy;
+        p.alpha -= p.decay;
+
+        this.ctx.save();
+        this.ctx.globalAlpha = p.alpha;
+        this.ctx.fillStyle   = p.color;
+        this.ctx.shadowColor = p.color;
+        this.ctx.shadowBlur  = 6;
+        this.ctx.beginPath();
+        this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.restore();
+      });
+
+      if (this.particles.length > 0) {
+        requestAnimationFrame(() => this._particleLoop());
+      } else {
+        this._rafRunning = false;
+      }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       EVENT BINDING
+    ══════════════════════════════════════════════════════════ */
+    _bindEvents() {
+      // State buttons
+      this.buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          this.setState(btn.dataset.state);
+        });
+      });
+
+      // Stage click (poke)
+      this.stage.addEventListener('click', e => this._onStageClick(e));
+
+      // Mouse tracking
+      document.addEventListener('mousemove', e => this._onMouseMove(e));
+      this.stage.addEventListener('mouseleave', () => this._onMouseLeave());
+    }
+
+    _updateButtons(state) {
+      this.buttons.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.state === state);
+      });
+    }
+  }
+
+  /* ── Boot ───────────────────────────────────────────────────── */
+  const bear = new BearController();
+  </script>
+</body>
+</html>
